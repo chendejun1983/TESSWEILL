@@ -1,0 +1,398 @@
+bluez的安装需要手动编译，在bluez官网（http://www.bluez.org/）中找到较新版本进行下载，笔者写文章时的最新版本是5.44，找到链接后在 ~/Downloads/下输入命令
+$ wget http://www.kernel.org/pub/linux/bluetooth/bluez-5.44.tar.xz
+
+下载到bluez源代码压缩包，执行
+$ xz -d bluez-5.44.tar.xz
+
+解压得到bluez-5.44.tar压缩包，再执行
+$ tar -xvf bluez-5.44.tar
+
+解压完成后，当前目录中就会多出来一个bluez-5.44目录，进入
+$ cd bluez-5.44
+
+
+ps：可以参照一下源码中附带的 README 文件，里面有大略的编译步骤，不过一些依赖包并没有给出详细的包名，需要你去一点一点探索。
+
+首先更新一下源
+$ sudo apt-get update
+
+
+*** 请选择优质镜像站！ ***
+*** 请选择优质镜像站！ ***
+*** 请选择优质镜像站！ ***
+
+国内清华的源还不错，可以戳这里https://mirror.tuna.tsinghua.edu.cn/help/raspbian/，某些劣质源可能部分依赖版本跟不上，会导致一些问题，（笔者就是这样不知不觉废了几个系统
+*** 一步到位安装方式： ***
+按照README文件中的提示，在安装bluez的时候需要安装几个依赖
+- GCC compiler
+- GLib library
+- D-Bus library
+- udev library (optional)
+- readline (command line clients)
+
+直接安装这些依赖即可
+sudo apt-get install gcc libglib2.0-dev libdbus-1-dev libdbus-c++-dev libudev-dev libical-dev libreadline-dev
+
+在当前目录中，执行
+$ ./configure --prefix=/usr --mandir=/usr/share/man \
+                                --sysconfdir=/etc --localstatedir=/var
+
+此时如果之前你没有安装过的话，可能会提示你安装一些依赖
+
+如果提示
+
+configure: error: GLib >= 2.28 is required
+
+安装libglib2.0-dev即可
+$ sudo apt-get install libglib2.0-dev
+
+如果出现类似
+The following packages have unmet dependencies
+libglib2.0-dev : Depends: libglib2.0-0 (= 2.33.12+really2.32.4-5) but 2.42.1-1 is to be installed
+                  Depends: libglib2.0-bin (= 2.33.12+really2.32.4-5) but 2.42.1-1 is to be installed
+                  Depends: libpcre3-dev (>= 8.11) but it is not going to be installed
+E: Unable to correct problems, you have held broken packages.
+
+解决方法是降级安装这些依赖项，即执行
+sudo apt-get install libglib2.0-0=2.33.12+really2.32.4-5 libglib2.0-bin=2.33.12+really2.32.4-5 libpcre3=1:8.30-5 libpcre3-dev
+
+***注意⚠️：简单来说，遇到这种情况不要试图去直接安装这些包，系统会提示无法安装，需要你指定安装的版本，这样才能正常安装，包的版本可以直接填写该依赖需要的版本，即括号里面提示的版本号。不过遇到这种情况，请关注一下是不是你的源有问题，可以尝试先换成官方源。 ***
+安装好依赖项之后就可以继续安装libglib2.0-dev了，完成后请重试configure的那条命令。
+
+如果提示
+
+configure: error: D-Bus >= 1.6 is required
+
+安装libdbus-1-dev 和 libdbus-c++-dev 即可解决，执行
+$ sudo apt-get install libdbus-1-dev libdbus-c++-dev
+
+如果也出现依赖未被安装的问题，可以按照第一条的解决方案，下同。
+
+如果出现
+
+configure: error: libudev >= 172 is required
+
+直接安装 libudev-dev 即可
+$ sudo apt-get install libudev-dev
+
+
+如果是
+
+configure: error: libical is required
+
+安装 libical-dev 即可
+$ sudo apt-get install libical-dev
+
+
+如果是
+
+configure: error: readline header files are required
+
+安装 libreadline-dev 依赖即可
+$ sudo apt-get install libreadline-dev
+
+如果是
+checking systemd system unit dir... configure: error: systemd system unit directory is required
+
+执行
+./configure --disable-systemd
+
+如果没有任何报错，那么配置应该生成好了，接下来编译安装即可，直接在当前目录下执行：
+sudo make  && sudo make install
+
+等运行完毕，bluez协议栈就安装好了。
+可以安装 libbluetooth-dev
+sudo apt-get install libbluetooth-dev
+
+然后在C程序中编写蓝牙程序。
+
+蓝牙知识博客
+
+http://blog.csdn.net/kobbee9/article/details/7751372
+
+
+
+
+
+连接错误打印
+
+a2dp-source profile connect failed for 6C:70:9F:7E:EF:A8: Protocol not available
+
+
+解决方法 
+
+1.bluetoothd -d -C -n --noplugin=a2dp
+2.bluetoothd -d -C -n --plugin=avrcp
+
+
+错误打印
+src/device.c:device_bonding_failed() status 14
+
+
+在bluez协议栈中得profiles/audio/avrcp.c
+static struct btd_profile avrcp_target_profile = { @ line 3863
+
+and
+
+static struct btd_profile avrcp_controller_profile = { @ line 3946
+
+添加   .auto_connect   = true,这个选项后重新编译蓝牙协议栈
+
+
+
+
+/***************************************************************************************************/
+连接蓝牙
+1.bluetoothd -n -d -C                       //运行蓝牙服务
+2.bluetoothctl                               //进入蓝牙控制
+[bluetooth]# show                         //查看控制器的 Power 是否为 yes，如果 Power 为 no，则运行 power on 
+[bluetooth]# power on    
+[bluetooth]#list                          //查看设备信息
+[bluetooth]#devices                         //查看配对设备
+[bluetooth]#remove                         //删除设备
+[bluetooth]# scan on                     //扫描到对应的设备后，使用 scan off 关闭 scan。 
+[bluetooth]# pair 00:22:48:DC:89:0F      //配对远端设备。
+[bluetooth]# trust 00:22:48:DC:89:0F      //避免以后设备回连
+[bluetooth]# connect 00:22:48:DC:89:0F    //连接远端设备 
+
+
+文件接收
+连接设备成功后可进行文件接收  
+obexd -r /home/text/ -n -a                //让设备处于接收状态    -r指定收到的文件存哪里   -n是不要以守护模式运行，会把日志输出到终端而不是系统日志。 -a就是重点——接收所有文件
+				                    	
+
+文件传送 
+1.obexd -n -d                             //运行发送服务
+2.obexctl                                 //等待交互命令
+[obex]# connect 00:25:56:D1:36:6B         //连接远程服务
+[00:25:56:D1:36:6B]# send /home/test/f.txt         //将/home/test目录下的f.txt文件传送
+
+
+
+播放音乐
+1.bluetoothd -n -d -C                       //运行蓝牙服务
+2.bluealsa --profile=a2dp-source &         //开启音频服务走a2dp协议
+3.bluetooctl                               //进入蓝牙控制
+[bluetooth]# show                         //查看控制器的 Power 是否为 yes，如果 Power 为 no，则运行 power on 
+[bluetooth]# power on    
+[bluetooth]#list                          //查看设备信息
+[bluetooth]#device                         //查看配对设备
+[bluetooth]#remove                         //删除设备
+[bluetooth]# scan on                     //扫描到对应的设备后，使用 scan off 关闭 scan。 
+[bluetooth]# pair 00:22:48:DC:89:0F      //配对远端设备。
+[bluetooth]# trust 00:22:48:DC:89:0F      //避免以后设备回连
+[bluetooth]# connect 00:22:48:DC:89:0F    //连接远端设备 
+4.aplay -D bluealsa:HCI=hci0,DEV=40:9F:38:7E:9C:92,PROFILE=a2dp /eom/xx.wav   //播放音乐
+
+
+BLUZ移植验证OK
+// 先执行 source /etc/profile
+1.安装bluez-lib-3.36.tar.gz
+
+tar zxvf bluez-lib-3.36.tar.gz
+./configure --prefix=/opt/arm/bluez --host=arm-hisiv300-linux --target=arm-hisiv300-linux CC=arm-hisiv300-linux-gcc
+make 
+make install
+
+2.安装  libxml2-2.7.4.tar.gz
+
+tar zxvf libxml2-2.7.4.tar.gz
+./configure --prefix=/opt/arm/bluez --host=arm-hisiv300-linux --target=arm-hisiv300-linux CC=arm-hisiv300-linux-gcc LDFLAGS=-lm
+make 
+make install
+
+3.安装 dbus-1.2.16.tar.gz
+
+tar zxvf dbus-1.2.16.tar.gz
+echo ac_cv_have_abstract_sockets=yes>arm-linux.cache
+./configure --prefix=/opt/arm/bluez --host=arm-hisiv300-linux --target=arm-hisiv300-linux CC="arm-hisiv300-linux-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib" --cache-file=arm-linux.cache --with-x=no  LDFLAGS=-Wl,-lexpat,-lm
+make 
+make install
+
+	
+4.安装 gettext-0.20.2.tar.gz
+
+tar zxvf gettext-0.20.2.tar.gz
+./configure --prefix=/opt/arm/bluez --host=arm-hisiv300-linux --target=arm-hisiv300-linux CC="arm-hisiv300-linux-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib"  LDFLAGS=-Wl,-lexpat,-lm
+
+make 
+make install
+
+	
+5.安装 zlib-1.2.8.tar.bz2
+
+tar -xjf  zlib-1.2.8.tar.bz2
+CC=arm-hisiv300-linux-gcc LDFLAGS=-Wl,-L/opt/arm/bluez/lib,-lexpat,-lm ./configure --prefix=/opt/arm/bluez  
+
+make 
+make install	
+	
+6.安装  glib-2.16.5.tar.bz2
+
+tar  -zxjf  glib-2.26.1.tar.gz
+echo ac_cv_type_long_long=yes>arm-linux.cache
+echo glib_cv_stack_grows=no>>arm-linux.cache
+echo glib_cv_uscore=no>>arm-linux.cache
+echo ac_cv_func_posix_getpwuid_r=yes>>arm-linux.cache
+echo ac_cv_func_posix_getgrgid_r=yes>>arm-linux.cache
+#注意：">"和">>"的区别
+ 
+./configure --prefix=/opt/arm/bluez --host=arm-hisiv300-linux --target=arm-hisiv300-linux CC="arm-hisiv300-linux-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib" --cache-file=arm-linux.cache LDFLAGS=-Wl,-lexpat,-lm
+//
+安装glib 时出现glib msgfmt.. no （这个问题极易出现在Ubuntu 上）
+解决方案：apt-get install gettest
+
+安装glib 时出现 error: Could not find a glib-genmarshal in your PATH，
+解决方案：先在主机安装 apt-get install libglib2.0-dev一
+
+configure: error: cannot run test program while cross compiling
+就检查依赖关系，然后修改arm-linux.cache文件
+向arm-linux.cache文件中写入配置信息，我们在编译前通过echo向该文件中写入的配置，就是为了解决这些问题
+
+configure: error: Could not find a glib-genmarshal in your PATH
+安装libglib2.0-dev
+sudo apt-get install libglib2.0-dev
+//
+make 
+make install
+
+
+7.安装 libusb-1.0.24.tar.bz2
+
+tar -xjf  libusb-1.0.24.tar.bz2
+./configure --prefix=/opt/arm/bluez --host=arm-hisiv300-linux --target=arm-hisiv300-linux --disable-udev CC="arm-hisiv300-linux-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib"
+
+make 
+make install
+
+
+8.安装 bluez-utils-3.36.tar.gz
+
+tar zxvf bluez-utils-3.36.tar.gz
+./configure --prefix=/opt/arm/bluez --host=arm-hisiv300-linux --target=arm-hisiv300-linux CC="arm-hisiv300-linux-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib" --disable-audio
+
+//
+bluez-utils ./configure 时出现：BLUEZ no Bluetooth library is required
+解决方案：sudo apt-get install libbluetooth-dev
+
+bluez-utils ./configure 时出现：configure: error: D-Bus library is required
+解决方案：sudo apt-get install libdbus-1-dev libdbus-glib-1-dev
+
+bluez-utils 编译 make 时出现bluez libgmodule-2.0.so could not read symbols: File in wrong 等
+解决方案： 查看 glib 配置时的 arm-linux.cache 和环境变量的配置，问题极有可能出现在这里
+//
+make 
+make install
+
+
+BLUEZ移植成功hciconfig hcitool,by chendejun
+// 先执行 source /etc/profile
+先要设置环境变量，source etc/profile,才能让交叉编译器arm-ca53-linux-gnueabihf起作用，没有的话，需要在etc/profile脚本里面加入
+
+1.安装bluez-lib-3.36.tar.gz
+tar zxvf bluez-lib-3.36.tar.gz
+./configure --prefix=/opt/arm/bluez --host=arm-ca53-linux-gnueabihf --target=arm-ca53-linux-gnueabihf CC=arm-ca53-linux-gnueabihf-gcc
+make 
+make install
+
+2.安装  libxml2-2.7.4.tar.gz
+tar zxvf libxml2-2.7.4.tar.gz
+./configure --prefix=/opt/arm/bluez --host=arm-ca53-linux-gnueabihf --target=arm-ca53-linux-gnueabihf CC=arm-ca53-linux-gnueabihf-gcc
+make 
+make install
+
+3.安装 dbus-1.2.16.tar.gz
+tar zxvf dbus-1.2.16.tar.gz
+./configure --prefix=/opt/arm/bluez --host=arm-ca53-linux-gnueabihf --target=arm-ca53-linux-gnueabihf CC="arm-ca53-linux-gnueabihf-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib" --cache-file=arm-linux.cache --with-x=no
+make 
+make install
+报错： error: Package requirements (expat) were not met，先去安装expat。安装了expat也没用，必须用1.2.16版本才能configure ok
+
+3.安装 expat-2.4.8.tar.gz
+tar zxvf expat-2.4.8.tar.gz
+./configure --prefix=/opt/arm/bluez --host=arm-ca53-linux-gnueabihf --target=arm-ca53-linux-gnueabihf CC="arm-ca53-linux-gnueabihf-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib"
+make 
+make install
+	
+	
+5.安装 zlib-1.2.8.tar.bz2
+tar -xjf  zlib-1.2.8.tar.bz2
+CC=arm-ca53-linux-gnueabihf-gcc LDFLAGS=-Wl,-L/opt/arm/bluez/lib,-lexpat,-lm ./configure --prefix=/opt/arm/bluez  
+make 
+make install	
+必须要用1.2.8，而且configure前面要用CC，因为放在后面不行。
+	
+6.安装  glib-2.16.5.tar.bz2
+tar  -zxjf  glib-2.16.5.tar.bz2
+./configure --prefix=/opt/arm/bluez --host=arm-ca53-linux-gnueabihf --target=arm-ca53-linux-gnueabihf CC="arm-ca53-linux-gnueabihf-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib" --cache-file=arm-linux.cache LDFLAGS=-Wl,-lexpat,-lm
+
+make 
+make install
+
+要安装gettext的库。
+tar gettext-0.21.tar.gz
+./configure --prefix=/opt/arm/bluez --host=arm-ca53-linux-gnueabihf --target=arm-ca53-linux-gnueabihf CC="arm-ca53-linux-gnueabihf-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib" 
+
+make 
+make install
+
+echo ac_cv_type_long_long=yes>arm-linux.cache
+echo glib_cv_stack_grows=no>>arm-linux.cache
+echo glib_cv_uscore=no>>arm-linux.cache
+echo ac_cv_func_posix_getpwuid_r=yes>>arm-linux.cache
+echo ac_cv_func_posix_getgrgid_r=yes>>arm-linux.cache
+#注意：">"和">>"的区别
+ 
+./configure --prefix=/opt/arm/bluez --host=arm-ca53-linux-gnueabihf --target=arm-ca53-linux-gnueabihf CC="arm-ca53-linux-gnueabihf-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib" --cache-file=arm-linux.cache LDFLAGS=-Wl,-lexpat,-lm
+//
+安装glib 时出现glib msgfmt.. no （这个问题极易出现在Ubuntu 上）
+解决方案：apt-get install gettest
+
+安装glib 时出现 error: Could not find a glib-genmarshal in your PATH，
+解决方案：先在主机安装 apt-get install libglib2.0-dev一
+
+configure: error: cannot run test program while cross compiling
+就检查依赖关系，然后修改arm-linux.cache文件
+向arm-linux.cache文件中写入配置信息，我们在编译前通过echo向该文件中写入的配置，就是为了解决这些问题
+
+
+
+8.安装 bluez-utils-3.36.tar.gz 
+tar zxvf bluez-utils-3.36.tar.gz
+./configure --prefix=/opt/arm/bluez --host=arm-ca53-linux-gnueabihf --target=arm-ca53-linux-gnueabihf CC="arm-ca53-linux-gnueabihf-gcc -I/opt/arm/bluez/include -L/opt/arm/bluez/lib" --disable-audio
+make 
+make install
+不能发现头文件，要指定-I/opt/arm/bluez/include，库文件也一样。
+--prefix是用来指定make install后的安装的路径，--host是用来指定编译器。
+
+报错device.c 里面没有定义g_molloc0_n函数，就安装glib_2.40，然后出现警告，就安装
+#pragma GCC diagnostic push
+
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+
+g_date_strftime（）
+
+{
+
+}
+
+#pragma GCC diagnostic pop
+
+
+然后又报错error: readline header files are required，实际上使用sudo apt-get install libreadline-dev命令即可。
+如果使用的arm编译器没有改头文件，即使安装了，可能仍然解决不了，这时只需要把宿主机的/usr/include readline整个目录拷贝到自己的arm-linux的编译器的usr/include目录下即可。
+不同的arm编译器可能路径不同，我这里的路径是/usr/local/arm/arm-cortex_a9-eabi-4.7/arm-cortex_a9-linux-gnueabi/sysroot/usr/include/
+
+
+c compiler is not available的报错，使用source /etc/profile
+
+我们看到我们编了一堆包，但是其实，所有的操作都只是为了编译bluez-util 这个包。
+bluez的协议层模块和驱动，都已经内置在内核中了，我们移植的只是bluez应用层提供的一些工具包和API，或者说就是命令。是为了我们更好的使用bluetooth。
+
+bluez-lib提供了基本的函数API，也就是库
+而dbus和glib等提供了一些其他工具包需要的函数API
+也就是说前面编译的包都是bluez-util的依赖库，是为了让我们顺序的编译好工具命令
+
+在bluez4.X和最新版bluez5.X中，已经将bluez-lib和bluez-util合并成了一个包，方便我们交叉编译。
+
+
